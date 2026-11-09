@@ -52,6 +52,10 @@ Get noteworthy files:
 Get flag file:
 `Get-ChildItem -Path C:\Users\ -Include flag.txt -File -Recurse -ErrorAction SilentlyContinue` 
 
+linux:
+`find . -type f -name '*.txt' 2>/dev/null`
+
+
 ## Find Powershell History
 ```powershell
 Get-History
@@ -452,3 +456,10 @@ OS{fb0378e0b6ef52d595f5fac53ff0081d}
 
 ```
 
+## maybe usefull links
+
+https://github.com/S3cur3Th1sSh1t/PowerSharpPack/tree/master - Many useful offensive CSharp Projects wraped into Powershell for easy usage. Does have the Potato exploits, Seatbelt, winPEAS, SharpUp etc.
+
+https://medium.com/r3d-buck3t/windows-privesc-with-sebackupprivilege-65d2cd1eb960 - copy SAM and SYSTEM files to extract hashes and escalate privileges, but they use a different method; mostly diskshadow and wbadmin
+
+https://github.com/Daniel-Ayz/OSCP#potatoes - info on the potato exploits.
